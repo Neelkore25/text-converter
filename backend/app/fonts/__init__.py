@@ -1,4 +1,4 @@
-"""Fonts package exports."""
+"""Fonts package."""
 from backend.app.fonts.font_inspector import FontInspectionReport, inspect_font
 from backend.app.fonts.glyph_catalog import (
     GlyphCategory,
@@ -8,21 +8,14 @@ from backend.app.fonts.glyph_catalog import (
     get_entries_by_category,
     get_glyph_catalog,
 )
-from backend.app.fonts.legacy_font_manager import (
-    UNAVAILABLE_NOTICE,
-    LegacyFontStatus,
-    check_legacy_source_availability,
-    list_all_source_fonts_status,
-)
-from backend.app.fonts.source_font_detector import (
-    LEGACY_SOURCE_FONTS,
-    SUPPORTED_SOURCE_FONTS,
-    UNICODE_FONTS,
-    DetectionConfidence,
+from backend.app.fonts.source_fonts import (
     SourceDetectionResult,
+    SourceFontInfo,
+    SourceFontStatus,
     SourceFontType,
-    classify_font_name,
-    detect_source_encoding,
+    detect_source_font,
+    get_all_source_fonts,
+    get_source_font_by_id,
 )
 
 __all__ = [
@@ -34,16 +27,11 @@ __all__ = [
     "find_by_unicode",
     "get_entries_by_category",
     "get_glyph_catalog",
-    "SourceFontType",
-    "DetectionConfidence",
     "SourceDetectionResult",
-    "SUPPORTED_SOURCE_FONTS",
-    "UNICODE_FONTS",
-    "LEGACY_SOURCE_FONTS",
-    "classify_font_name",
-    "detect_source_encoding",
-    "LegacyFontStatus",
-    "UNAVAILABLE_NOTICE",
-    "check_legacy_source_availability",
-    "list_all_source_fonts_status",
+    "SourceFontInfo",
+    "SourceFontStatus",
+    "SourceFontType",
+    "detect_source_font",
+    "get_all_source_fonts",
+    "get_source_font_by_id",
 ]
