@@ -6,6 +6,7 @@ and rendering visual verification samples using the actual Shivaji01 Normal font
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -69,8 +70,9 @@ class LabReport:
         return (self.passed_cases / self.total_cases * 100.0) if self.total_cases > 0 else 0.0
 
 
+@lru_cache(maxsize=16)
 def load_shivaji_font(size: int = 28) -> ImageFont.FreeTypeFont:
-    """Loads the Shivaji01 Normal font at the specified point size."""
+    """Loads and caches the Shivaji01 Normal font at the specified point size."""
     if not FONT_PATH.exists():
         raise FileNotFoundError(f"Shivaji01 font not found at {FONT_PATH}")
     return ImageFont.truetype(str(FONT_PATH), size)

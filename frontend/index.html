@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shivaji01 Document Converter</title>
+  <style>
+    @font-face {
+      font-family: 'Shivaji01';
+      src: url('/assets/fonts/Shivaji01%20Normal.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    :root {
+      --bg-base: #08090B;
+      --bg-secondary: #0F1115;
+      --bg-card: #151922;
+      --bg-card-hover: #1B1F29;
+      --border: #232936;
+      --border-focus: #6366F1;
+      --text-primary: #F5F7FA;
+      --text-muted: #A7AFBF;
+      --text-dim: #64748B;
+      --accent-primary: #6366F1;
+      --accent-hover: #4F46E5;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --accent-cyan: #06B6D4;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      overflow-x: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text-primary);
+      padding: 0 12px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-badge {
+      background: var(--accent-primary);
+      color: white;
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .nav-list {
+      list-style: none;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background: var(--accent-glow);
+      color: var(--accent-primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 14px;
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .sidebar-footer div:first-child {
+      color: var(--text-primary);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .topbar {
+      height: 64px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      flex-shrink: 0;
+    }
+
+    .topbar-title {
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topbar-badge {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--accent-cyan);
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .topbar-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .content-area {
+      padding: 32px;
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Bento Grid Dashboard */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .bento-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border 0.15s ease, transform 0.15s ease;
+    }
+
+    .bento-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .bento-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .bento-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .bento-sub {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+
+    /* Card Panels */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .panel-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+
+    /* Upload Box */
+    .upload-box {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      background: rgba(21, 25, 34, 0.4);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .upload-box:hover, .upload-box.dragover {
+      border-color: var(--accent-primary);
+      background: var(--accent-glow);
+    }
+
+    .upload-icon {
+      font-size: 2.5rem;
+      margin-bottom: 12px;
+    }
+
+    .upload-text {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .upload-sub {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+
+    /* Form Controls */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .select, .input, .textarea {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      outline: none;
+      transition: border 0.15s ease;
+      font-family: inherit;
+    }
+
+    .select:focus, .input:focus, .textarea:focus {
+      border-color: var(--border-focus);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+    }
+
+    /* Split Workspace */
+    .split-workspace {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 24px;
+    }
+
+    .preview-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 220px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .shivaji-rendered {
+      font-family: 'Shivaji01', serif !important;
+      font-size: 1.25rem !important;
+      line-height: 1.8 !important;
+    }
+
+    /* Progress bar */
+    .progress-bar-container {
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      height: 8px;
+      width: 100%;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-cyan));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* Table */
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .table th {
+      text-align: left;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+    .badge-warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .badge-danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+
+    /* Test Lab Pills */
+    .pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .pill {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .pill:hover {
+      border-color: var(--accent-primary);
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span>⌘ Shivaji Converter</span>
+      <span class="brand-badge">2026</span>
+    </div>
+
+    <ul class="nav-list">
+      <li class="nav-item active" onclick="switchTab('dashboard')">
+        <span>📊</span> Dashboard
+      </li>
+      <li class="nav-item" onclick="switchTab('convert')">
+        <span>🔄</span> Convert
+      </li>
+      <li class="nav-item" onclick="switchTab('testlab')">
+        <span>🧪</span> Test Lab
+      </li>
+      <li class="nav-item" onclick="switchTab('fonts')">
+        <span>🔤</span> Fonts
+      </li>
+      <li class="nav-item" onclick="switchTab('history')">
+        <span>📜</span> History
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div>Target Font</div>
+      <div>✓ Shivaji01 Normal.ttf</div>
+      <div style="margin-top: 4px; font-size: 0.75rem; color: var(--text-dim);">Local Processing (No cloud upload)</div>
+    </div>
+  </aside>
+
+  <!-- Main Container -->
+  <div class="main">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">
+        <span>Marathi / Devanagari</span>
+        <span style="color: var(--text-dim);">→</span>
+        <span style="color: var(--accent-cyan);">Shivaji01 Normal</span>
+        <span class="topbar-badge">v1.0.0 Production</span>
+      </div>
+      <div class="topbar-controls">
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Source Font: <strong>Auto Detect</strong></span>
+      </div>
+    </header>
+
+    <div class="content-area">
+
+      <!-- TAB 1: DASHBOARD -->
+      <section id="tab-dashboard" class="tab-content active">
+        <div class="bento-grid">
+          <div class="bento-card">
+            <div class="bento-title">Files Converted</div>
+            <div class="bento-value" id="stat-total">0</div>
+            <div class="bento-sub">Total documents processed</div>
+          </div>
+          <div class="bento-card">
+            <div class="bento-title">Successful</div>
+            <div class="bento-value" style="color: var(--success);" id="stat-success">0</div>
+            <div class="bento-sub">100% clean conversions</div>
+          </div>
+          <div class="bento-card">
+            <div class="bento-title">Needs Review</div>
+            <div class="bento-value" style="color: var(--warning);" id="stat-warnings">0</div>
+            <div class="bento-sub">Warnings flagged</div>
+          </div>
+          <div class="bento-card">
+            <div class="bento-title">Supported Fonts</div>
+            <div class="bento-value" style="color: var(--accent-cyan);" id="stat-fonts">10</div>
+            <div class="bento-sub">Unicode & legacy profiles</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Quick Convert Document</div>
+            <button class="btn btn-primary" onclick="switchTab('convert')">Open Full Converter</button>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">
+            Convert your Marathi Word documents (.docx), PDFs, and text files (.txt) into legacy Shivaji01 format with automatic cluster parsing and Short-I reordering.
+          </p>
+          <div class="upload-box" onclick="document.getElementById('quick-file-input').click()">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">Click or drop document here</div>
+            <div class="upload-sub">Supports PDF, DOCX, TXT</div>
+            <input type="file" id="quick-file-input" style="display: none;" accept=".txt,.pdf,.docx" onchange="handleFileSelected(event)" />
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: CONVERT -->
+      <section id="tab-convert" class="tab-content">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Document Converter</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+            <!-- Left: Upload & Progress -->
+            <div>
+              <div class="upload-box" id="drop-zone" onclick="document.getElementById('doc-file-input').click()">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text" id="upload-label">Drag & Drop PDF / DOCX / TXT or Click to Browse</div>
+                <div class="upload-sub" id="upload-sublabel">Files processed locally on your computer</div>
+                <input type="file" id="doc-file-input" style="display: none;" accept=".txt,.pdf,.docx" onchange="handleFileSelected(event)" />
+              </div>
+
+              <!-- Real Progress -->
+              <div id="progress-container" style="display: none; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
+                  <span id="progress-status-text">Analyzing document...</span>
+                  <span id="progress-percent">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                  <div class="progress-bar" id="progress-bar"></div>
+                </div>
+              </div>
+
+              <!-- Results Banner -->
+              <div id="result-banner" style="display: none; margin-top: 20px; padding: 16px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px;">
+                <div style="font-weight: 600; color: var(--success); margin-bottom: 8px;">✓ Conversion Complete</div>
+                <div style="display: flex; gap: 12px; margin-top: 12px;">
+                  <a id="download-btn" class="btn btn-primary" href="#" download>Download Converted File</a>
+                  <button class="btn btn-secondary" onclick="showReportModal()">View Conversion Report</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Settings -->
+            <div style="background: var(--bg-secondary); padding: 20px; border-radius: var(--radius); border: 1px solid var(--border);">
+              <div style="font-weight: 600; margin-bottom: 16px;">Conversion Settings</div>
+
+              <div class="form-group">
+                <label class="form-label">Source Font</label>
+                <select class="select" id="setting-source-font">
+                  <option value="auto">Auto Detect</option>
+                  <option value="mangal">Mangala / Mangal (Unicode)</option>
+                  <option value="nirmala_ui">Nirmala UI (Unicode)</option>
+                  <option value="kokila">Kokila (Unicode)</option>
+                  <option value="utsaah">Utsaah (Unicode)</option>
+                  <option value="devanagari_sangam_mn">Devanagari Sangam MN (Unicode)</option>
+                  <option value="cochin">Cochin (Unicode)</option>
+                  <option value="kruti_dev">Kruti Dev (Legacy)</option>
+                  <option value="devlys">DevLys (Legacy)</option>
+                  <option value="kantal">Kantal (Legacy)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Target Font</label>
+                <input class="input" type="text" value="Shivaji01 Normal" disabled />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Output Format</label>
+                <select class="select" id="setting-output-format">
+                  <option value="docx">DOCX (Styled with Shivaji01)</option>
+                  <option value="txt">TXT (Plain converted text)</option>
+                  <option value="pdf">PDF (Embedded Shivaji font)</option>
+                </select>
+              </div>
+
+              <button class="btn btn-primary" style="width: 100%; margin-top: 8px;" id="start-convert-btn" onclick="startConversion()" disabled>
+                Convert Document
+              </button>
+            </div>
+          </div>
+
+          <!-- Split Preview -->
+          <div class="split-workspace" id="split-workspace" style="display: none;">
+            <div>
+              <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 8px;">Source Preview (Unicode)</div>
+              <div class="preview-box" id="preview-source"></div>
+            </div>
+            <div>
+              <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 8px;">
+                Shivaji01 Preview
+                <label style="font-size: 0.75rem; margin-left: 12px; cursor: pointer; color: var(--accent-cyan);">
+                  <input type="checkbox" id="toggle-shivaji-font" checked onchange="togglePreviewFont()" /> Render in Shivaji01 Font
+                </label>
+              </div>
+              <div class="preview-box shivaji-rendered" id="preview-converted"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: TEST LAB -->
+      <section id="tab-testlab" class="tab-content">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Interactive Font Test Lab</div>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
+                Enter Marathi text below to inspect Unicode $\rightarrow$ Shivaji01 conversion in real time.
+              </p>
+            </div>
+          </div>
+
+          <div class="pill-group">
+            <span class="pill" onclick="setTestInput('अ आ इ ई उ ऊ ऋ ए ऐ ओ औ')">अ आ इ ई</span>
+            <span class="pill" onclick="setTestInput('क ख ग घ ङ च छ ज झ ञ')">क ख ग घ</span>
+            <span class="pill" onclick="setTestInput('क का कि की कु कू के कै को कौ कं कः')">कि की कु कू</span>
+            <span class="pill" onclick="setTestInput('कि गि ति नि मि शि प्रि क्रि र्कि')">Special 'ि'</span>
+            <span class="pill" onclick="setTestInput('क्र ग्र प्र ब्र द्र त्र क्ष ज्ञ श्र क्त स्त स्त्र द्व द्य')">क्र प्र त्र क्ष ज्ञ</span>
+            <span class="pill" onclick="setTestInput('महाराष्ट्र माझा देश आहे.')">महाराष्ट्र माझा देश आहे</span>
+          </div>
+
+          <div class="split-workspace" style="margin-top: 0;">
+            <div>
+              <div class="form-label" style="margin-bottom: 8px;">Unicode Input</div>
+              <textarea class="textarea" id="test-input" rows="8" style="width: 100%;" oninput="handleTestInput()">महाराष्ट्र माझा देश आहे.</textarea>
+            </div>
+            <div>
+              <div class="form-label" style="margin-bottom: 8px;">
+                Shivaji01 Output
+                <label style="float: right; cursor: pointer; color: var(--accent-cyan);">
+                  <input type="checkbox" id="test-font-toggle" checked onchange="handleTestInput()" /> View with Shivaji01 Font
+                </label>
+              </div>
+              <div class="preview-box shivaji-rendered" id="test-output" style="height: 196px;"></div>
+            </div>
+          </div>
+
+          <div id="test-stats" style="margin-top: 16px; font-size: 0.85rem; color: var(--text-dim);"></div>
+        </div>
+      </section>
+
+      <!-- TAB 4: FONTS -->
+      <section id="tab-fonts" class="tab-content">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Font Inventory & Profiles</div>
+          </div>
+
+          <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 600; font-size: 1rem;">Target Font: Shivaji01 Normal.ttf</div>
+                <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 2px;">Installed in assets/fonts/Shivaji01 Normal.ttf</div>
+              </div>
+              <span class="badge badge-success">✓ Verified & Loaded</span>
+            </div>
+          </div>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Source Font Name</th>
+                <th>Encoding Type</th>
+                <th>Status</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody id="fonts-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 5: HISTORY -->
+      <section id="tab-history" class="tab-content">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Local Conversion History</div>
+          </div>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>File Name</th>
+                <th>Source Font</th>
+                <th>Target Font</th>
+                <th>Characters</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Modal for Conversion Report -->
+  <div id="report-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); width: 600px; max-width: 90%; padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="font-weight: 600; font-size: 1.1rem;">Conversion Audit Report</div>
+        <button class="btn btn-secondary" onclick="closeReportModal()" style="padding: 4px 10px;">✕</button>
+      </div>
+      <pre id="modal-report-text" style="background: var(--bg-secondary); padding: 16px; border-radius: 8px; font-family: monospace; font-size: 0.88rem; line-height: 1.5; max-height: 400px; overflow-y: auto; color: var(--text-primary);"></pre>
+    </div>
+  </div>
+
+  <script>
+    let selectedFile = null;
+    let latestReport = "";
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+      const targetTab = document.getElementById(`tab-${tabId}`);
+      if (targetTab) targetTab.classList.add('active');
+
+      const navItems = document.querySelectorAll('.nav-item');
+      const tabIndices = { dashboard: 0, convert: 1, testlab: 2, fonts: 3, history: 4 };
+      if (tabIndices[tabId] !== undefined) {
+        navItems[tabIndices[tabId]].classList.add('active');
+      }
+
+      if (tabId === 'dashboard') loadStats();
+      if (tabId === 'fonts') loadFonts();
+      if (tabId === 'history') loadHistory();
+      if (tabId === 'testlab') handleTestInput();
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        document.getElementById('stat-total').textContent = data.files_converted;
+        document.getElementById('stat-success').textContent = data.successful;
+        document.getElementById('stat-warnings').textContent = data.needs_review;
+        document.getElementById('stat-fonts').textContent = data.supported_fonts_count;
+      } catch (e) {
+        console.error('Failed to load stats:', e);
+      }
+    }
+
+    async function loadFonts() {
+      try {
+        const res = await fetch('/api/fonts');
+        const data = await res.json();
+        const tbody = document.getElementById('fonts-table-body');
+        tbody.innerHTML = '';
+        data.source_fonts.forEach(f => {
+          const tr = document.createElement('tr');
+          const badgeClass = f.status.includes('✓') ? 'badge-success' : 'badge-warning';
+          tr.innerHTML = `
+            <td><strong>${f.display_name}</strong></td>
+            <td><code>${f.font_type}</code></td>
+            <td><span class="badge ${badgeClass}">${f.status}</span></td>
+            <td style="color: var(--text-muted);">${f.description}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error('Failed to load fonts:', e);
+      }
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/history');
+        const records = await res.json();
+        const tbody = document.getElementById('history-table-body');
+        tbody.innerHTML = '';
+        if (records.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 24px;">No conversion history records yet.</td></tr>`;
+          return;
+        }
+        records.forEach(r => {
+          const tr = document.createElement('tr');
+          const badgeClass = r.warnings_count === 0 ? 'badge-success' : 'badge-warning';
+          const dlBtn = r.output_path ? `<a class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" href="/api/download/${r.output_path.split('\\\\').pop().split('/').pop()}" download>Download</a>` : '-';
+          tr.innerHTML = `
+            <td>#${r.id}</td>
+            <td><strong>${r.filename}</strong></td>
+            <td>${r.source_font}</td>
+            <td>${r.target_font}</td>
+            <td>${r.characters_processed.toLocaleString()}</td>
+            <td><span class="badge ${badgeClass}">${r.status}</span></td>
+            <td style="color: var(--text-dim); font-size: 0.8rem;">${r.timestamp ? r.timestamp.slice(0, 16).replace('T', ' ') : '-'}</td>
+            <td>${dlBtn}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error('Failed to load history:', e);
+      }
+    }
+
+    function handleFileSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      selectedFile = file;
+      document.getElementById('upload-label').textContent = file.name;
+      document.getElementById('upload-sublabel').textContent = `${(file.size / 1024).toFixed(1)} KB`;
+      document.getElementById('start-convert-btn').disabled = false;
+      document.getElementById('result-banner').style.display = 'none';
+      document.getElementById('split-workspace').style.display = 'none';
+      if (document.getElementById('tab-convert').classList.contains('active') === false) {
+        switchTab('convert');
+      }
+    }
+
+    async function startConversion() {
+      if (!selectedFile) return;
+
+      const progressContainer = document.getElementById('progress-container');
+      const progressBar = document.getElementById('progress-bar');
+      const progressText = document.getElementById('progress-status-text');
+      const progressPercent = document.getElementById('progress-percent');
+      const convertBtn = document.getElementById('start-convert-btn');
+
+      progressContainer.style.display = 'block';
+      convertBtn.disabled = true;
+
+      // Real step animation
+      const steps = [
+        { text: "Analyzing document...", pct: 20 },
+        { text: "Detecting source encoding...", pct: 40 },
+        { text: "Converting Devanagari clusters...", pct: 70 },
+        { text: "Applying Shivaji01 mapping...", pct: 90 },
+      ];
+
+      for (const s of steps) {
+        progressText.textContent = s.text;
+        progressBar.style.width = `${s.pct}%`;
+        progressPercent.textContent = `${s.pct}%`;
+        await new Promise(r => setTimeout(r, 120));
+      }
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('source_font', document.getElementById('setting-source-font').value);
+      formData.append('output_format', document.getElementById('setting-output-format').value);
+
+      try {
+        const res = await fetch('/api/convert/file', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert(`Conversion Error: ${err.detail || 'Failed to process document'}`);
+          progressContainer.style.display = 'none';
+          convertBtn.disabled = false;
+          return;
+        }
+
+        const data = await res.json();
+        latestReport = data.report;
+
+        // 100% complete
+        progressBar.style.width = '100%';
+        progressPercent.textContent = '100%';
+        progressText.textContent = 'Validating output... Done!';
+
+        // Show result banner
+        document.getElementById('result-banner').style.display = 'block';
+        document.getElementById('download-btn').href = data.download_url;
+
+        // Show previews
+        document.getElementById('split-workspace').style.display = 'grid';
+        document.getElementById('preview-source').textContent = data.preview_source || '';
+        document.getElementById('preview-converted').textContent = data.preview_converted || '';
+
+        loadStats();
+      } catch (e) {
+        alert('Network error during conversion: ' + e.message);
+      } finally {
+        convertBtn.disabled = false;
+      }
+    }
+
+    function togglePreviewFont() {
+      const el = document.getElementById('preview-converted');
+      const isChecked = document.getElementById('toggle-shivaji-font').checked;
+      if (isChecked) {
+        el.classList.add('shivaji-rendered');
+      } else {
+        el.classList.remove('shivaji-rendered');
+      }
+    }
+
+    function showReportModal() {
+      document.getElementById('modal-report-text').textContent = latestReport;
+      document.getElementById('report-modal').style.display = 'flex';
+    }
+
+    function closeReportModal() {
+      document.getElementById('report-modal').style.display = 'none';
+    }
+
+    async function handleTestInput() {
+      const text = document.getElementById('test-input').value;
+      if (!text) {
+        document.getElementById('test-output').textContent = '';
+        document.getElementById('test-stats').textContent = '';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/convert/text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text, source_font: 'auto' })
+        });
+        const data = await res.json();
+        const outBox = document.getElementById('test-output');
+        outBox.textContent = data.converted_text;
+
+        const useFont = document.getElementById('test-font-toggle').checked;
+        if (useFont) {
+          outBox.classList.add('shivaji-rendered');
+        } else {
+          outBox.classList.remove('shivaji-rendered');
+        }
+
+        document.getElementById('test-stats').textContent =
+          `Characters: ${data.total_characters} | Converted: ${data.converted_characters} | Warnings: ${data.warning_count} | Processing time: ${data.elapsed_ms}ms`;
+      } catch (e) {
+        console.error('Test conversion error:', e);
+      }
+    }
+
+    function setTestInput(str) {
+      document.getElementById('test-input').value = str;
+      handleTestInput();
+    }
+
+    // Initialize
+    loadStats();
+    handleTestInput();
+  </script>
+</body>
+</html>
