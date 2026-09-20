@@ -15,6 +15,8 @@ env/
 
 # Scratch & temporary test artifacts
 scratch/
+storage/
+output/
 *.log
 
 # OS generated files
