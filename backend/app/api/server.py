@@ -30,7 +30,7 @@ from backend.app.fonts.source_fonts import (
     get_source_font_by_id,
 )
 from backend.app.history import HistoryManager, HistoryRecord
-from backend.app.output.docx_output import write_converted_docx
+from backend.app.output.docx_output import transform_existing_docx, write_converted_docx
 from backend.app.output.pdf_output import write_converted_pdf
 from backend.app.output.text_output import write_converted_txt
 from backend.app.validation.validator import validate_conversion
@@ -94,6 +94,8 @@ async def get_fonts():
                 "font_type": f.font_type.value,
                 "status": f.status.value,
                 "description": f.description,
+                "font_file_available": f.font_file_available,
+                "mapping_table_available": f.mapping_table_available,
             }
             for f in fonts
         ],
@@ -239,7 +241,10 @@ async def convert_file(
         if out_ext == "txt":
             write_converted_txt(res.converted_text, target_out_path)
         elif out_ext == "docx":
-            write_converted_docx(res.converted_text, target_out_path)
+            if ext == ".docx":
+                transform_existing_docx(saved_path, target_out_path)
+            else:
+                write_converted_docx(res.converted_text, target_out_path)
         elif out_ext == "pdf":
             write_converted_pdf(res.converted_text, target_out_path)
 

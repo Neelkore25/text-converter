@@ -46,12 +46,27 @@ class SourceFontInfo:
         return False
 
     @property
+    def font_file_available(self) -> bool:
+        """Indicates if font file is present in assets/fonts/source/."""
+        if self.font_type == SourceFontType.UNICODE_DEVANAGARI:
+            return True  # System/Standard Unicode font
+        return self.is_installed_in_assets
+
+    @property
+    def mapping_table_available(self) -> bool:
+        """Indicates whether Unicode <-> legacy mapping table is present in code."""
+        if self.font_type == SourceFontType.UNICODE_DEVANAGARI:
+            return True
+        # Legacy fonts require both font file and mapping table data
+        return False
+
+    @property
     def status(self) -> SourceFontStatus:
         """Determines the operational status of the source font."""
         if self.font_type == SourceFontType.UNICODE_DEVANAGARI:
             return SourceFontStatus.UNICODE_SUPPORTED
         # Legacy font
-        if self.is_installed_in_assets:
+        if self.font_file_available and self.mapping_table_available:
             return SourceFontStatus.LEGACY_AVAILABLE
         return SourceFontStatus.LEGACY_REQUIRES_FONT
 

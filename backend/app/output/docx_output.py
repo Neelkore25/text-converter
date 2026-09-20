@@ -64,3 +64,60 @@ def write_converted_docx(
 
     doc.save(str(out_p))
     return out_p.resolve()
+
+
+def transform_existing_docx(
+    source_path: str | Path,
+    output_path: str | Path,
+) -> Path:
+    """Modifies an existing DOCX document in-place, preserving 100% of formatting,
+    margins, styles, tables, headers, and footers while converting all text runs
+    to Shivaji01 Normal font and mapping Devanagari text.
+    """
+    from backend.app.conversion.unicode_to_shivaji import convert_unicode_to_shivaji
+
+    src_p = Path(source_path)
+    out_p = Path(output_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+
+    doc = Document(str(src_p))
+
+    def process_paragraph(p):
+        for run in p.runs:
+            if run.text:
+                res = convert_unicode_to_shivaji(run.text)
+                run.text = res.converted_text
+                set_run_font(run, TARGET_FONT_NAME)
+
+    # 1. Body paragraphs
+    for p in doc.paragraphs:
+        process_paragraph(p)
+
+    # 2. Tables (including nested cells)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    process_paragraph(p)
+
+    # 3. Headers and Footers across all sections
+    for section in doc.sections:
+        for p in section.header.paragraphs:
+            process_paragraph(p)
+        for table in section.header.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        process_paragraph(p)
+
+        for p in section.footer.paragraphs:
+            process_paragraph(p)
+        for table in section.footer.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        process_paragraph(p)
+
+    doc.save(str(out_p))
+    return out_p.resolve()
+

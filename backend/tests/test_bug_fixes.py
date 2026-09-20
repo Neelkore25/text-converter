@@ -206,3 +206,136 @@ def test_end_to_end_mangal_docx_paste_simulation(tmp_path: Path):
         assert rFonts.get(qn("w:ascii")) == "Shivaji01 Normal"
         assert rFonts.get(qn("w:hAnsi")) == "Shivaji01 Normal"
         assert rFonts.get(qn("w:eastAsia")) == "Shivaji01 Normal"
+
+
+def test_docx_with_table_header_footer_formatting_preserved(tmp_path: Path):
+    """Verify DOCX with tables, headers, and footers has all text converted and formatting preserved."""
+    from backend.app.output.docx_output import transform_existing_docx
+
+    src_docx = tmp_path / "table_and_header.docx"
+    doc = Document()
+
+    # 1. Add Header
+    section = doc.sections[0]
+    header = section.header
+    header_p = header.paragraphs[0]
+    header_run = header_p.add_run("दस्तावेज शीर्षक: महाराष्ट्र परिचय")
+    set_run_font(header_run, "Mangal")
+
+    # 2. Add Footer
+    footer = section.footer
+    footer_p = footer.paragraphs[0]
+    footer_run = footer_p.add_run("पृष्ठ १: अधिकृत अहवाल")
+    set_run_font(footer_run, "Mangal")
+
+    # 3. Add Body Paragraph with Bold/Italic runs
+    p = doc.add_paragraph()
+    r1 = p.add_run("ठळक मजकूर: ")
+    r1.bold = True
+    set_run_font(r1, "Mangal")
+    r2 = p.add_run("तिरपा मजकूर: महाराष्ट्र.")
+    r2.italic = True
+    set_run_font(r2, "Mangal")
+
+    # 4. Add Table with cells
+    table = doc.add_table(rows=2, cols=2)
+    cell_texts = [
+        ["जिल्हा", "मुख्यालय"],
+        ["पुणे", "पुणे शहर"]
+    ]
+    for r_idx, row in enumerate(table.rows):
+        for c_idx, cell in enumerate(row.cells):
+            cell_p = cell.paragraphs[0]
+            c_run = cell_p.add_run(cell_texts[r_idx][c_idx])
+            set_run_font(c_run, "Mangal")
+
+    doc.save(str(src_docx))
+
+    # Transform document
+    out_docx = tmp_path / "table_and_header_converted.docx"
+    transform_existing_docx(src_docx, out_docx)
+
+    # Verify converted output
+    res_doc = Document(str(out_docx))
+
+    # Verify Header
+    res_hdr_run = res_doc.sections[0].header.paragraphs[0].runs[0]
+    hdr_fonts = res_hdr_run._r.find(qn("w:rPr")).find(qn("w:rFonts"))
+    assert hdr_fonts.get(qn("w:cs")) == "Shivaji01 Normal"
+    assert hdr_fonts.get(qn("w:ascii")) == "Shivaji01 Normal"
+
+    # Verify Footer
+    res_ftr_run = res_doc.sections[0].footer.paragraphs[0].runs[0]
+    ftr_fonts = res_ftr_run._r.find(qn("w:rPr")).find(qn("w:rFonts"))
+    assert ftr_fonts.get(qn("w:cs")) == "Shivaji01 Normal"
+
+    # Verify Bold/Italic preserved
+    res_p = res_doc.paragraphs[0]
+    assert res_p.runs[0].bold is True
+    assert res_p.runs[1].italic is True
+
+    # Verify Table Cells
+    res_table = res_doc.tables[0]
+    assert len(res_table.rows) == 2
+    for row in res_table.rows:
+        for cell in row.cells:
+            cell_run = cell.paragraphs[0].runs[0]
+            c_fonts = cell_run._r.find(qn("w:rPr")).find(qn("w:rFonts"))
+            assert c_fonts.get(qn("w:cs")) == "Shivaji01 Normal"
+            assert c_fonts.get(qn("w:ascii")) == "Shivaji01 Normal"
+            assert c_fonts.get(qn("w:hAnsi")) == "Shivaji01 Normal"
+            assert c_fonts.get(qn("w:eastAsia")) == "Shivaji01 Normal"
+
+
+def test_legacy_fonts_presence_and_mapping_status():
+    """Verify font file presence and mapping table presence are tracked separately for legacy fonts."""
+    from backend.app.fonts.source_fonts import get_source_font_by_id
+
+    for font_id in ("kruti_dev", "devlys", "kantal"):
+        font = get_source_font_by_id(font_id)
+        assert font is not None
+        # File is not present in assets/fonts/source
+        assert font.font_file_available is False
+        # Mapping table is not present
+        assert font.mapping_table_available is False
+        assert "requires font" in font.status.value.lower()
+
+    # Verify API reports both attributes
+    resp = client.get("/api/fonts")
+    assert resp.status_code == 200
+    data = resp.json()
+    for sf in data["source_fonts"]:
+        if sf["font_type"] == "legacy_encoded":
+            assert sf["font_file_available"] is False
+            assert sf["mapping_table_available"] is False
+
+
+def test_client_side_jszip_docx_pipeline_markup():
+    """Verify index.html contains JSZip, magic-byte inspection, formatting preservation, and detected font badge."""
+    html_content = Path("index.html").read_text(encoding="utf-8")
+
+    # JSZip library inclusion
+    assert "jszip.min.js" in html_content
+
+    # Magic bytes check for ZIP (0x50 0x4B) and legacy .doc (0xD0 0xCF 0x11 0xE0)
+    assert "0x50 && headerBytes[1] === 0x4B" in html_content
+    assert "0xD0 && headerBytes[1] === 0xCF" in html_content
+    assert "Legacy .doc format is not supported" in html_content
+
+    # word/document.xml extraction & parsing
+    assert 'zip.file("word/document.xml")' in html_content
+    assert "DOMParser" in html_content
+
+    # Font inspection and display
+    assert 'id="topbar-source-font"' in html_content
+    assert 'id="detected-source-badge"' in html_content
+    assert 'id="detected-font-name"' in html_content
+
+    # Run-level font assignment across all 4 slots
+    assert 'rFonts.setAttribute(\'w:ascii\', \'Shivaji01 Normal\')' in html_content
+    assert 'rFonts.setAttribute(\'w:cs\', \'Shivaji01 Normal\')' in html_content
+    assert 'rFonts.setAttribute(\'w:eastAsia\', \'Shivaji01 Normal\')' in html_content
+
+    # Re-zipping and Blob generation
+    assert "generateAsync" in html_content
+    assert "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in html_content
