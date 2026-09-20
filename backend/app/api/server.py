@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import shutil
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -109,10 +110,13 @@ async def get_stats():
 
 @app.get("/api/history")
 async def get_history(limit: int = 50):
-    """Returns local conversion history records."""
+    """Returns local conversion history records with download links."""
     records = history_mgr.get_all_records(limit=limit)
-    return [
-        {
+    res = []
+    for r in records:
+        out_name = Path(r.output_path).name if r.output_path else f"converted_{Path(r.filename).stem}.{r.output_format.lower()}"
+        dl_url = f"/api/download/{out_name}" if r.output_path else "#"
+        res.append({
             "id": r.id,
             "filename": r.filename,
             "timestamp": r.timestamp,
@@ -123,10 +127,11 @@ async def get_history(limit: int = 50):
             "status": r.status,
             "output_format": r.output_format,
             "output_path": r.output_path,
+            "output_filename": out_name,
+            "download_url": dl_url,
             "report_text": r.report_text,
-        }
-        for r in records
-    ]
+        })
+    return res
 
 
 @app.post("/api/convert/text")
@@ -253,7 +258,7 @@ async def convert_file(
         rec = HistoryRecord(
             id=None,
             filename=filename,
-            timestamp=None,
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
             source_font=detected_name,
             target_font="Shivaji01 Normal",
             characters_processed=res.total_characters,

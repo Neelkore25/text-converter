@@ -260,8 +260,13 @@
     }
 
     .upload-box:hover, .upload-box.dragover {
-      border-color: var(--accent-primary);
-      background: var(--accent-glow);
+      border-color: var(--accent-cyan) !important;
+      background: rgba(6, 182, 212, 0.12) !important;
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
+    }
+
+    .devanagari-text, #preview-source, #test-input, #rich-paste-box {
+      font-family: 'Mangal', 'Nirmala UI', 'Noto Sans Devanagari', 'Devanagari Sangam MN', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
 
     .upload-icon {
@@ -530,7 +535,7 @@
           <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">
             Convert your Marathi Word documents (.docx), PDFs, and text files (.txt) into legacy Shivaji01 format with automatic cluster parsing and Short-I reordering.
           </p>
-          <div class="upload-box" onclick="document.getElementById('quick-file-input').click()">
+          <div class="upload-box" id="quick-drop-zone" onclick="document.getElementById('quick-file-input').click()">
             <div class="upload-icon">📄</div>
             <div class="upload-text">Click or drop document here</div>
             <div class="upload-sub">Supports TXT, DOCX, PDF</div>
@@ -549,11 +554,22 @@
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
             <!-- Left: Upload & Progress -->
             <div>
+              <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <button id="mode-btn-upload" class="btn btn-primary" onclick="setConvertInputMode('upload')" style="padding: 6px 14px; font-size: 0.85rem;">📂 Upload / Drop Document</button>
+                <button id="mode-btn-paste" class="btn btn-secondary" onclick="setConvertInputMode('paste')" style="padding: 6px 14px; font-size: 0.85rem;">📋 Paste Word DOCX / Text</button>
+              </div>
+
               <div class="upload-box" id="drop-zone" onclick="document.getElementById('doc-file-input').click()">
                 <div class="upload-icon">📂</div>
                 <div class="upload-text" id="upload-label">Drag & Drop PDF / DOCX / TXT or Click to Browse</div>
                 <div class="upload-sub" id="upload-sublabel">Files processed locally with cluster parsing & reordering</div>
                 <input type="file" id="doc-file-input" style="display: none;" accept=".txt,.pdf,.docx" onchange="handleFileSelected(event)" />
+              </div>
+
+              <!-- Rich Paste Zone (shown when mode is 'paste') -->
+              <div id="paste-box-container" style="display: none;">
+                <textarea class="textarea devanagari-text" id="rich-paste-box" rows="8" style="width: 100%;" placeholder="Paste your Marathi / Devanagari text or copy-paste directly from Word here (Ctrl+V)... Word paragraphs, line breaks, font hints (Mangal), and sizing are preserved."></textarea>
+                <div id="paste-meta-badge" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; font-size: 0.85rem; color: var(--accent-cyan);"></div>
               </div>
 
               <!-- Real Progress -->
@@ -956,12 +972,27 @@
     }
 
     /* =========================================================================
-       UI INTERACTION HANDLERS & BACKEND AUTODETECT
+       UI INTERACTION HANDLERS, DRAG & DROP, RICH PASTE, & HISTORY PERSISTENCE
        ========================================================================= */
 
     let selectedFile = null;
     let latestReport = "";
-    let localHistory = [];
+    const STORAGE_HISTORY_KEY = "shivaji_conversion_history_v1";
+
+    function getStoredLocalHistory() {
+      try {
+        const raw = localStorage.getItem(STORAGE_HISTORY_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveStoredLocalHistory(records) {
+      try {
+        localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(records.slice(0, 100)));
+      } catch (e) {}
+    }
 
     // Check if backend API server is online or running standalone static
     let isBackendAvailable = false;
@@ -993,21 +1024,247 @@
       if (tabId === 'testlab') handleTestInput();
     }
 
+    function setConvertInputMode(mode) {
+      const uploadBtn = document.getElementById('mode-btn-upload');
+      const pasteBtn = document.getElementById('mode-btn-paste');
+      const dropZone = document.getElementById('drop-zone');
+      const pasteBoxContainer = document.getElementById('paste-box-container');
+
+      if (mode === 'paste') {
+        uploadBtn.className = 'btn btn-secondary';
+        pasteBtn.className = 'btn btn-primary';
+        dropZone.style.display = 'none';
+        pasteBoxContainer.style.display = 'block';
+        document.getElementById('rich-paste-box').focus();
+      } else {
+        uploadBtn.className = 'btn btn-primary';
+        pasteBtn.className = 'btn btn-secondary';
+        dropZone.style.display = 'block';
+        pasteBoxContainer.style.display = 'none';
+      }
+    }
+
+    /* -------------------------------------------------------------------------
+       BUG 1 & BUG 2 FIX: WORD DOCX RICH HTML PASTE & PARAGRAPH STRUCTURE PARSER
+       ------------------------------------------------------------------------- */
+    function parseWordHtml(html, fallbackText) {
+      if (!html) {
+        const paras = (fallbackText || '').split(/\r?\n\r?\n/).filter(p => p.trim().length > 0);
+        return {
+          text: fallbackText || '',
+          paragraphs: paras.length > 0 ? paras : (fallbackText ? [fallbackText] : []),
+          detectedFont: null,
+          detectedSizePt: 12,
+          fontHints: []
+        };
+      }
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      const fontHints = new Set();
+      let detectedSizePt = null;
+
+      // Extract font-family and font-size from all elements & style tags
+      const allElements = doc.querySelectorAll('*');
+      allElements.forEach(el => {
+        if (el.tagName.toLowerCase() === 'font' && el.getAttribute('face')) {
+          fontHints.add(el.getAttribute('face').trim().replace(/['"]/g, ''));
+        }
+        const styleAttr = el.getAttribute('style') || '';
+        if (styleAttr) {
+          const ffMatch = styleAttr.match(/(?:^|;)\s*font-family:\s*([^;]+)/i);
+          if (ffMatch) {
+            ffMatch[1].split(',').forEach(f => {
+              const cleaned = f.trim().replace(/['"]/g, '');
+              if (cleaned) fontHints.add(cleaned);
+            });
+          }
+          const msoBidi = styleAttr.match(/(?:^|;)\s*mso-bidi-font-family:\s*([^;]+)/i);
+          if (msoBidi) {
+            fontHints.add(msoBidi[1].trim().replace(/['"]/g, ''));
+          }
+          const msoAscii = styleAttr.match(/(?:^|;)\s*mso-ascii-font-family:\s*([^;]+)/i);
+          if (msoAscii) {
+            fontHints.add(msoAscii[1].trim().replace(/['"]/g, ''));
+          }
+          const fsMatch = styleAttr.match(/(?:^|;)\s*font-size:\s*([0-9.]+)\s*(pt|px)/i);
+          if (fsMatch && !detectedSizePt) {
+            let sizeVal = parseFloat(fsMatch[1]);
+            if (fsMatch[2].toLowerCase() === 'px') sizeVal *= 0.75;
+            detectedSizePt = Math.round(sizeVal);
+          }
+        }
+      });
+
+      const KNOWN_FONTS = ["Mangal", "Mangala", "Nirmala UI", "Kokila", "Utsaah", "Devanagari Sangam MN", "Cochin", "Kruti Dev", "DevLys", "Kantal"];
+      let detectedFont = null;
+      for (const hint of fontHints) {
+        const found = KNOWN_FONTS.find(k => k.toLowerCase() === hint.toLowerCase());
+        if (found) {
+          detectedFont = found;
+          break;
+        }
+      }
+
+      // Preserve paragraph structure: walk <p>, <div>, <br>
+      const paragraphNodes = doc.querySelectorAll('p, div.MsoNormal, h1, h2, h3, h4, h5, h6');
+      const paragraphs = [];
+
+      if (paragraphNodes.length > 0) {
+        paragraphNodes.forEach(pNode => {
+          const clone = pNode.cloneNode(true);
+          clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+          const text = clone.textContent.replace(/\r/g, '').trim();
+          if (text.length > 0 || clone.innerHTML.includes('&nbsp;')) {
+            paragraphs.push(text);
+          }
+        });
+      }
+
+      let fullText = "";
+      if (paragraphs.length > 0) {
+        fullText = paragraphs.join('\n\n');
+      } else {
+        const bodyClone = doc.body.cloneNode(true);
+        bodyClone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+        bodyClone.querySelectorAll('p, div').forEach(block => block.after('\n\n'));
+        fullText = bodyClone.textContent.replace(/\r/g, '').trim();
+        const splitParas = fullText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
+        paragraphs.push(...splitParas);
+      }
+
+      if (!fullText.trim() && fallbackText) {
+        fullText = fallbackText;
+        const splitParas = fallbackText.split(/\r?\n\r?\n/).map(p => p.trim()).filter(p => p.length > 0);
+        paragraphs.push(...splitParas);
+      }
+
+      return {
+        text: fullText,
+        paragraphs: paragraphs.length > 0 ? paragraphs : (fullText ? [fullText] : []),
+        detectedFont: detectedFont || (fontHints.size > 0 ? Array.from(fontHints)[0] : null),
+        detectedSizePt: detectedSizePt || 12,
+        fontHints: Array.from(fontHints)
+      };
+    }
+
+    function handleRichPaste(e, targetInput, isConvertTab) {
+      const html = e.clipboardData ? e.clipboardData.getData('text/html') : '';
+      const plain = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+
+      if (!html && !plain) return;
+
+      e.preventDefault();
+      const parsed = parseWordHtml(html, plain);
+
+      // Insert/set preserved paragraph text
+      targetInput.value = parsed.text;
+
+      // Auto-select detected font if available
+      if (parsed.detectedFont) {
+        const select = document.getElementById('setting-source-font');
+        if (select) {
+          const cleanTarget = parsed.detectedFont.toLowerCase().replace(/[^a-z0-9]/g, '');
+          for (let opt of select.options) {
+            const optClean = opt.text.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (optClean.includes(cleanTarget) || opt.value.toLowerCase().includes(cleanTarget)) {
+              select.value = opt.value;
+              break;
+            }
+          }
+        }
+      }
+
+      // Update badge metadata
+      const badge = document.getElementById(isConvertTab ? 'paste-meta-badge' : 'test-stats');
+      const fontLabel = parsed.detectedFont || 'Mangal (Unicode)';
+      const sizeLabel = parsed.detectedSizePt ? `${parsed.detectedSizePt}pt` : '12pt';
+      const paraCount = parsed.paragraphs.length;
+      const paraLabel = `${paraCount} paragraph${paraCount === 1 ? '' : 's'}`;
+
+      if (badge) {
+        badge.style.display = 'block';
+        badge.textContent = `✓ Word DOCX Pasted: Font "${fontLabel}" | Size: ${sizeLabel} | Structure: ${paraLabel} preserved`;
+      }
+
+      if (isConvertTab) {
+        // Prepare synthetic file for converter
+        const blob = new Blob([parsed.text], { type: 'text/plain;charset=utf-8' });
+        selectedFile = new File([blob], "pasted_document.docx", { type: "text/plain" });
+        document.getElementById('upload-label').textContent = `Pasted: ${paraLabel} (${fontLabel})`;
+        document.getElementById('upload-sublabel').textContent = `${parsed.text.length} characters (Size: ${sizeLabel})`;
+        document.getElementById('start-convert-btn').disabled = false;
+        document.getElementById('result-banner').style.display = 'none';
+        document.getElementById('split-workspace').style.display = 'none';
+      } else {
+        handleTestInput();
+      }
+    }
+
+    /* -------------------------------------------------------------------------
+       BUG 3 FIX: HTML5 DRAG-AND-DROP FILE UPLOAD HANDLER WITH PREVENTDEFAULT
+       ------------------------------------------------------------------------- */
+    function setupDragAndDrop() {
+      const dropZones = [
+        document.getElementById('drop-zone'),
+        document.getElementById('quick-drop-zone')
+      ].filter(Boolean);
+
+      dropZones.forEach(zone => {
+        ['dragenter', 'dragover'].forEach(name => {
+          zone.addEventListener(name, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            zone.classList.add('dragover');
+          }, false);
+        });
+
+        ['dragleave', 'dragend'].forEach(name => {
+          zone.addEventListener(name, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            zone.classList.remove('dragover');
+          }, false);
+        });
+
+        zone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.classList.remove('dragover');
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0];
+            handleFileSelected({ target: { files: [file] } });
+          }
+        }, false);
+      });
+
+      // Prevent global window drop from navigating away
+      window.addEventListener('dragover', (e) => e.preventDefault(), false);
+      window.addEventListener('drop', (e) => e.preventDefault(), false);
+    }
+
+    /* -------------------------------------------------------------------------
+       BUG 4 FIX: FULL HISTORY PERSISTENCE (FASTAPI API + LOCALSTORAGE FALLBACK)
+       ------------------------------------------------------------------------- */
     async function loadStats() {
       if (isBackendAvailable) {
         try {
           const res = await fetch('/api/stats');
-          const data = await res.json();
-          document.getElementById('stat-total').textContent = data.files_converted;
-          document.getElementById('stat-success').textContent = data.successful;
-          document.getElementById('stat-warnings').textContent = data.needs_review;
-          document.getElementById('stat-fonts').textContent = data.supported_fonts_count;
-          return;
+          if (res.ok) {
+            const data = await res.json();
+            document.getElementById('stat-total').textContent = data.files_converted;
+            document.getElementById('stat-success').textContent = data.successful;
+            document.getElementById('stat-warnings').textContent = data.needs_review;
+            document.getElementById('stat-fonts').textContent = data.supported_fonts_count;
+            return;
+          }
         } catch (e) {}
       }
       // Local fallback
-      const total = localHistory.length;
-      const success = localHistory.filter(r => r.warnings_count === 0).length;
+      const stored = getStoredLocalHistory();
+      const total = stored.length;
+      const success = stored.filter(r => r.warnings_count === 0).length;
       const review = total - success;
       document.getElementById('stat-total').textContent = total;
       document.getElementById('stat-success').textContent = success;
@@ -1044,25 +1301,48 @@
       });
     }
 
-    function loadHistory() {
+    async function loadHistory() {
       const tbody = document.getElementById('history-table-body');
+      if (!tbody) return;
       tbody.innerHTML = '';
-      if (localHistory.length === 0) {
+      let records = [];
+
+      if (isBackendAvailable) {
+        try {
+          const res = await fetch('/api/history');
+          if (res.ok) {
+            records = await res.json();
+          }
+        } catch (e) {
+          console.warn('Backend history load failed, falling back to stored history:', e);
+        }
+      }
+
+      if (!records || records.length === 0) {
+        records = getStoredLocalHistory();
+      }
+
+      if (!records || records.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 24px;">No conversion history records yet.</td></tr>`;
         return;
       }
-      localHistory.slice().reverse().forEach((r, idx) => {
+
+      records.forEach((r, idx) => {
         const tr = document.createElement('tr');
-        const badgeClass = r.warnings_count === 0 ? 'badge-success' : 'badge-warning';
-        const dlBtn = `<a class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" href="${r.download_url}" download="${r.output_filename}">Download</a>`;
+        const isWarn = r.warnings_count > 0;
+        const badgeClass = !isWarn ? 'badge-success' : 'badge-warning';
+        const dlUrl = r.download_url || '#';
+        const outName = r.output_filename || 'download';
+        const dlBtn = `<a class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" href="${dlUrl}" download="${outName}">Download</a>`;
+        const ts = (r.timestamp || '').slice(0, 16).replace('T', ' ');
         tr.innerHTML = `
-          <td>#${localHistory.length - idx}</td>
+          <td>#${r.id || (records.length - idx)}</td>
           <td><strong>${r.filename}</strong></td>
           <td>${r.source_font}</td>
           <td>${r.target_font}</td>
-          <td>${r.characters_processed.toLocaleString()}</td>
+          <td>${(r.characters_processed || 0).toLocaleString()}</td>
           <td><span class="badge ${badgeClass}">${r.status}</span></td>
-          <td style="color: var(--text-dim); font-size: 0.8rem;">${r.timestamp}</td>
+          <td style="color: var(--text-dim); font-size: 0.8rem;">${ts}</td>
           <td>${dlBtn}</td>
         `;
         tbody.appendChild(tr);
@@ -1070,7 +1350,7 @@
     }
 
     function handleFileSelected(event) {
-      const file = event.target.files[0];
+      const file = event.target.files ? event.target.files[0] : null;
       if (!file) return;
       selectedFile = file;
       document.getElementById('upload-label').textContent = file.name;
@@ -1135,7 +1415,26 @@
           document.getElementById('split-workspace').style.display = 'grid';
           document.getElementById('preview-source').textContent = data.preview_source || '';
           document.getElementById('preview-converted').textContent = data.preview_converted || '';
+
+          // Persist record to local storage as well
+          const stored = getStoredLocalHistory();
+          stored.unshift({
+            id: data.record_id || (stored.length + 1),
+            filename: selectedFile.name,
+            source_font: data.source_font,
+            target_font: data.target_font,
+            characters_processed: data.total_characters,
+            warnings_count: data.warning_count,
+            status: data.status,
+            timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
+            output_filename: data.output_filename,
+            download_url: data.download_url
+          });
+          saveStoredLocalHistory(stored);
+
           loadStats();
+          loadHistory();
+          convertBtn.disabled = false;
           return;
         } catch (e) {
           console.warn('Backend upload failed, falling back to browser converter:', e);
@@ -1168,7 +1467,9 @@
         document.getElementById('preview-source').textContent = content.slice(0, 500);
         document.getElementById('preview-converted').textContent = res.converted.slice(0, 500);
 
-        localHistory.push({
+        const stored = getStoredLocalHistory();
+        stored.unshift({
+          id: stored.length + 1,
           filename: selectedFile.name,
           source_font: "Mangal (Auto)",
           target_font: "Shivaji01 Normal",
@@ -1179,12 +1480,14 @@
           output_filename: outName,
           download_url: dlUrl
         });
+        saveStoredLocalHistory(stored);
 
         loadStats();
+        loadHistory();
         convertBtn.disabled = false;
       };
 
-      if (selectedFile.name.endsWith('.txt')) {
+      if (selectedFile.name.endsWith('.txt') || selectedFile.name.endsWith('.docx')) {
         reader.readAsText(selectedFile, "utf-8");
       } else {
         alert("Client-side conversion is operating on GitHub Pages. For complex binary DOCX/PDF formatting, please run 'python -m backend.cli serve' on your computer, or test your Marathi text directly in the Test Lab!");
@@ -1245,12 +1548,53 @@
       handleTestInput();
     }
 
-    // Initialize
-    checkBackend().then(() => {
-      loadStats();
-      loadFonts();
-      handleTestInput();
+    // Initialize listeners and data
+    document.addEventListener('DOMContentLoaded', () => {
+      setupDragAndDrop();
+
+      const richPasteBox = document.getElementById('rich-paste-box');
+      if (richPasteBox) {
+        richPasteBox.addEventListener('paste', (e) => handleRichPaste(e, richPasteBox, true));
+        richPasteBox.addEventListener('input', () => {
+          if (richPasteBox.value.trim()) {
+            const blob = new Blob([richPasteBox.value], { type: 'text/plain;charset=utf-8' });
+            selectedFile = new File([blob], "pasted_document.docx", { type: "text/plain" });
+            document.getElementById('start-convert-btn').disabled = false;
+          }
+        });
+      }
+
+      const testInput = document.getElementById('test-input');
+      if (testInput) {
+        testInput.addEventListener('paste', (e) => handleRichPaste(e, testInput, false));
+      }
+
+      checkBackend().then(() => {
+        loadStats();
+        loadFonts();
+        loadHistory();
+        handleTestInput();
+      });
     });
+
+    // In case DOM is already loaded
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setupDragAndDrop();
+      const richPasteBox = document.getElementById('rich-paste-box');
+      if (richPasteBox) {
+        richPasteBox.addEventListener('paste', (e) => handleRichPaste(e, richPasteBox, true));
+      }
+      const testInput = document.getElementById('test-input');
+      if (testInput) {
+        testInput.addEventListener('paste', (e) => handleRichPaste(e, testInput, false));
+      }
+      checkBackend().then(() => {
+        loadStats();
+        loadFonts();
+        loadHistory();
+        handleTestInput();
+      });
+    }
   </script>
 </body>
 </html>

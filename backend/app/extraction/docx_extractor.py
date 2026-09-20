@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from docx import Document
+from docx.oxml.ns import qn
 from backend.app.extraction import DocumentContent
 
 
@@ -39,10 +40,21 @@ def extract_text_from_docx(file_path: str | Path) -> DocumentContent:
         if p.text:
             paragraph_texts.append(p.text)
 
-        # Inspect run fonts
+        # Inspect run fonts (including complex script w:cs, ascii, hAnsi, eastAsia)
         for run in p.runs:
             if run.font and run.font.name:
                 font_hints.add(run.font.name)
+            try:
+                rPr = run._r.find(qn("w:rPr"))
+                if rPr is not None:
+                    rFonts = rPr.find(qn("w:rFonts"))
+                    if rFonts is not None:
+                        for attr in ("w:cs", "w:ascii", "w:hAnsi", "w:eastAsia"):
+                            val = rFonts.get(qn(attr))
+                            if val:
+                                font_hints.add(val)
+            except Exception:
+                pass
 
     # Also inspect tables if any
     for table in doc.tables:

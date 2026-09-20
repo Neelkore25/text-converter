@@ -15,7 +15,7 @@ TARGET_FONT_NAME = "Shivaji01 Normal"
 
 
 def set_run_font(run, font_name: str) -> None:
-    """Explicitly sets font name for both ascii and complex script (hAnsi, cs) elements."""
+    """Explicitly sets font name for ascii, hAnsi, eastAsia, and complex script (cs) elements."""
     run.font.name = font_name
     rPr = run._r.get_or_add_rPr()
     rFonts = rPr.find(qn("w:rFonts"))
@@ -24,6 +24,7 @@ def set_run_font(run, font_name: str) -> None:
         rPr.append(rFonts)
     rFonts.set(qn("w:ascii"), font_name)
     rFonts.set(qn("w:hAnsi"), font_name)
+    rFonts.set(qn("w:eastAsia"), font_name)
     rFonts.set(qn("w:cs"), font_name)
 
 
@@ -47,11 +48,13 @@ def write_converted_docx(
 
     doc = Document()
 
-    # Split text into paragraphs
-    paragraphs = converted_text.split("\n\n")
+    # Normalize newlines
+    normalized_text = converted_text.replace("\r\n", "\n").replace("\r", "\n")
+    paragraphs = normalized_text.split("\n\n")
+
     for para_text in paragraphs:
-        lines = para_text.split("\n")
         p = doc.add_paragraph()
+        lines = para_text.split("\n")
         for idx, line in enumerate(lines):
             if idx > 0:
                 p.add_run().add_break()
