@@ -339,3 +339,19 @@ def test_client_side_jszip_docx_pipeline_markup():
     # Re-zipping and Blob generation
     assert "generateAsync" in html_content
     assert "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in html_content
+
+
+def test_load_history_defined_and_defensively_isolated():
+    """Verify loadHistory is defined in frontend html files and callers isolate side effects."""
+    for rel_path in ["index.html", "frontend/index.html"]:
+        content = Path(rel_path).read_text(encoding="utf-8")
+
+        # Must declare loadHistory
+        assert "async function loadHistory()" in content, f"loadHistory() missing in {rel_path}"
+
+        # Must have history table body container
+        assert 'id="history-table-body"' in content, f"#history-table-body missing in {rel_path}"
+
+        # Must defensively catch history/stats errors so conversion never throws ReferenceError
+        assert "Non-blocking error saving/loading history" in content, f"Defensive try/catch missing in {rel_path}"
+

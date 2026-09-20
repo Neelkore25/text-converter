@@ -1318,6 +1318,54 @@
       });
     }
 
+    async function loadHistory() {
+      const tbody = document.getElementById('history-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      let records = [];
+
+      if (isBackendAvailable) {
+        try {
+          const res = await fetch('/api/history');
+          if (res.ok) {
+            records = await res.json();
+          }
+        } catch (e) {
+          console.warn('Backend history load failed, falling back to stored history:', e);
+        }
+      }
+
+      if (!records || records.length === 0) {
+        records = getStoredLocalHistory();
+      }
+
+      if (!records || records.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 24px;">No conversion history records yet.</td></tr>`;
+        return;
+      }
+
+      records.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        const isWarn = r.warnings_count > 0;
+        const badgeClass = !isWarn ? 'badge-success' : 'badge-warning';
+        const dlUrl = r.download_url || '#';
+        const outName = r.output_filename || 'download';
+        const dlBtn = `<a class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" href="${dlUrl}" download="${outName}">Download</a>`;
+        const ts = (r.timestamp || '').slice(0, 16).replace('T', ' ');
+        tr.innerHTML = `
+          <td>#${r.id || (records.length - idx)}</td>
+          <td><strong>${r.filename}</strong></td>
+          <td>${r.source_font || 'Auto'}</td>
+          <td>${r.target_font || 'Shivaji01 Normal'}</td>
+          <td>${(r.characters_processed || 0).toLocaleString()}</td>
+          <td><span class="badge ${badgeClass}">${r.status || 'Completed'}</span></td>
+          <td style="color: var(--text-dim); font-size: 0.8rem;">${ts}</td>
+          <td>${dlBtn}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
     async function handleFileSelected(event) {
       const file = event.target.files ? event.target.files[0] : null;
       if (!file) return;
@@ -1561,22 +1609,26 @@
             document.getElementById('preview-source').textContent = data.preview_source || '';
             document.getElementById('preview-converted').textContent = data.preview_converted || '';
 
-            const stored = getStoredLocalHistory();
-            stored.unshift({
-              id: data.record_id || (stored.length + 1),
-              filename: selectedFile.name,
-              source_font: data.source_font,
-              target_font: data.target_font,
-              characters_processed: data.total_characters,
-              warnings_count: data.warning_count,
-              status: data.status,
-              timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
-              output_filename: data.output_filename,
-              download_url: data.download_url
-            });
-            saveStoredLocalHistory(stored);
-            loadStats();
-            loadHistory();
+            try {
+              const stored = getStoredLocalHistory();
+              stored.unshift({
+                id: data.record_id || (stored.length + 1),
+                filename: selectedFile.name,
+                source_font: data.source_font,
+                target_font: data.target_font,
+                characters_processed: data.total_characters,
+                warnings_count: data.warning_count,
+                status: data.status,
+                timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
+                output_filename: data.output_filename,
+                download_url: data.download_url
+              });
+              saveStoredLocalHistory(stored);
+              loadStats();
+              loadHistory();
+            } catch (histErr) {
+              console.warn('Non-blocking error saving/loading history:', histErr);
+            }
             convertBtn.disabled = false;
             return;
           }
@@ -1703,23 +1755,28 @@
         dlBtn.href = dlUrl;
         dlBtn.download = outName;
 
-        const stored = getStoredLocalHistory();
-        stored.unshift({
-          id: stored.length + 1,
-          filename: selectedFile ? selectedFile.name : "document.docx",
-          source_font: fontNameHint,
-          target_font: "Shivaji01 Normal",
-          characters_processed: totalChars,
-          warnings_count: warningCount,
-          status: status,
-          timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
-          output_filename: outName,
-          download_url: dlUrl
-        });
-        saveStoredLocalHistory(stored);
+        try {
+          const stored = getStoredLocalHistory();
+          stored.unshift({
+            id: stored.length + 1,
+            filename: selectedFile ? selectedFile.name : "document.docx",
+            source_font: fontNameHint,
+            target_font: "Shivaji01 Normal",
+            characters_processed: totalChars,
+            warnings_count: warningCount,
+            status: status,
+            timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
+            output_filename: outName,
+            download_url: dlUrl
+          });
+          saveStoredLocalHistory(stored);
 
-        loadStats();
-        loadHistory();
+          loadStats();
+          loadHistory();
+        } catch (histErr) {
+          console.warn('Non-blocking error saving/loading history:', histErr);
+        }
+
         convertBtn.disabled = false;
 
       } catch (err) {
