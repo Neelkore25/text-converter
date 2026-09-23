@@ -73,8 +73,20 @@ class TextConversionRequest(BaseModel):
 async def serve_index():
     index_file = FRONTEND_DIR / "index.html"
     if not index_file.exists():
+        index_file = Path("index.html")
+    if not index_file.exists():
         raise HTTPException(status_code=404, detail="Frontend index.html not found.")
     return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+
+
+@app.get("/style.css")
+async def serve_css():
+    css_file = FRONTEND_DIR / "style.css"
+    if not css_file.exists():
+        css_file = Path("style.css")
+    if not css_file.exists():
+        raise HTTPException(status_code=404, detail="Frontend style.css not found.")
+    return FileResponse(str(css_file), media_type="text/css")
 
 
 @app.get("/api/fonts")
